@@ -1,0 +1,49 @@
+{
+  "name": "app-de-acceso",
+  "version": "1.0.0",
+  "description": "Aplicación de escritorio para control de acceso con Electron + Vite + React",
+  "author": "Tu Nombre o Equipo",
+  "license": "ISC",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "electron .",
+    "preview": "npm run build && npm run start",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron-pack": "electron-builder"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "class-variance-authority": "^0.7.1",
+    "framer-motion": "^12.23.24",
+    "lucide-react": "^0.546.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.3.1",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react-swc": "^4.1.0",
+    "electron": "^38.3.0",
+    "vite": "^7.1.11",
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.0.1",
+    "electron-builder": "^24.6.0"
+  },
+  "build": {
+    "appId": "com.tuapp.integrador",
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

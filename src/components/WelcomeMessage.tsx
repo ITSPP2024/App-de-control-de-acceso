@@ -1,6 +1,7 @@
 import { Card } from './ui/card';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from "framer-motion";
 import { User } from 'lucide-react';
+import React from 'react';
 
 interface WelcomeMessageProps {
   userName: string | null;

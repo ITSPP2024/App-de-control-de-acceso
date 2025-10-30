@@ -1,5 +1,6 @@
 import { LogIn, LogOut } from 'lucide-react';
 import { Card } from './ui/card';
+import React from 'react';
 
 interface AccessTypeSelectorProps {
   accessType: 'entrada' | 'salida';

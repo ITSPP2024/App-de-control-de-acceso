@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { AccessControlHeader } from './components/AccessControlHeader';
 import { ScannerPanel } from './components/ScannerPanel';
 import { AccessTypeSelector } from './components/AccessTypeSelector';
 import { WelcomeMessage } from './components/WelcomeMessage';
+import { ConfigModal } from './components/ConfigModal';
 import { Toaster } from './components/ui/sonner';
+
 
 // Mock user database
 const mockUsers = [
@@ -16,9 +18,14 @@ const mockUsers = [
 ];
 
 export default function App() {
-  const [currentZone] = useState('Laboratorio 1');
+  const [currentZone, setCurrentZone] = useState('Laboratorio 1');
   const [accessType, setAccessType] = useState<'entrada' | 'salida'>('entrada');
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [enabledDevices, setEnabledDevices] = useState({
+    card: true,
+    fingerprint: true,
+  });
 
   const handleAccessGranted = (method: string) => {
     // Simulate getting a random user from the database
@@ -34,11 +41,22 @@ export default function App() {
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 overflow-hidden">
       <Toaster />
+      <ConfigModal 
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        currentZone={currentZone}
+        onZoneChange={setCurrentZone}
+        enabledDevices={enabledDevices}
+        onDevicesChange={setEnabledDevices}
+      />
       
       <div className="h-full flex flex-col p-6 gap-6">
         {/* Header */}
         <div className="flex-shrink-0">
-          <AccessControlHeader zone={currentZone} />
+          <AccessControlHeader 
+            zone={currentZone} 
+            onOpenConfig={() => setConfigOpen(true)}
+          />
         </div>
 
         {/* Main Content */}
@@ -52,7 +70,10 @@ export default function App() {
               />
             </div>
             <div className="flex-1 min-h-0">
-              <ScannerPanel onAccessGranted={handleAccessGranted} />
+              <ScannerPanel 
+                onAccessGranted={handleAccessGranted}
+                enabledDevices={enabledDevices}
+              />
             </div>
           </div>
 

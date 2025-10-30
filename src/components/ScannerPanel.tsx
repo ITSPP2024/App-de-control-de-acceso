@@ -1,17 +1,22 @@
 import { useState } from 'react';
+import React from 'react';
 import { CreditCard, Fingerprint, CheckCircle, XCircle } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner@2.0.3';
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from 'sonner';
 
 interface ScannerPanelProps {
   onAccessGranted: (method: string) => void;
+  enabledDevices: {
+    card: boolean;
+    fingerprint: boolean;
+  };
 }
 
 type ScanStatus = 'idle' | 'scanning' | 'success' | 'denied';
 
-export function ScannerPanel({ onAccessGranted }: ScannerPanelProps) {
+export function ScannerPanel({ onAccessGranted, enabledDevices }: ScannerPanelProps) {
   const [cardStatus, setCardStatus] = useState<ScanStatus>('idle');
   const [fingerprintStatus, setFingerprintStatus] = useState<ScanStatus>('idle');
 
@@ -63,24 +68,38 @@ export function ScannerPanel({ onAccessGranted }: ScannerPanelProps) {
     <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200 p-6 shadow-sm">      
       <div className="flex flex-col gap-6 h-full">
         {/* Card Scanner */}
-        <ScannerOption
-          icon={CreditCard}
-          title="Escanear Tarjeta"
-          description="Acerque su tarjeta"
-          status={cardStatus}
-          onScan={handleCardScan}
-          color="blue"
-        />
+        {enabledDevices.card && (
+          <ScannerOption
+            icon={CreditCard}
+            title="Escanear Tarjeta"
+            description="Acerque su tarjeta"
+            status={cardStatus}
+            onScan={handleCardScan}
+            color="blue"
+          />
+        )}
 
         {/* Fingerprint Scanner */}
-        <ScannerOption
-          icon={Fingerprint}
-          title="Escanear Huella"
-          description="Coloque su dedo"
-          status={fingerprintStatus}
-          onScan={handleFingerprintScan}
-          color="purple"
-        />
+        {enabledDevices.fingerprint && (
+          <ScannerOption
+            icon={Fingerprint}
+            title="Escanear Huella"
+            description="Coloque su dedo"
+            status={fingerprintStatus}
+            onScan={handleFingerprintScan}
+            color="purple"
+          />
+        )}
+
+        {/* No devices enabled message */}
+        {!enabledDevices.card && !enabledDevices.fingerprint && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-slate-400">
+              <p>No hay dispositivos de escaneo habilitados</p>
+              <p className="text-sm mt-2">Configúrelos desde el botón de configuración</p>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );

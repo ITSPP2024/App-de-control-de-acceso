@@ -1,11 +1,14 @@
-import { MapPin, Clock } from 'lucide-react';
+import { MapPin, Clock, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button } from './ui/button';
+import React from 'react';
 
 interface AccessControlHeaderProps {
   zone: string;
+  onOpenConfig: () => void;
 }
 
-export function AccessControlHeader({ zone }: AccessControlHeaderProps) {
+export function AccessControlHeader({ zone, onOpenConfig }: AccessControlHeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -24,11 +27,22 @@ export function AccessControlHeader({ zone }: AccessControlHeaderProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-blue-50 px-6 py-3 rounded-xl border border-blue-100">
-          <Clock className="w-6 h-6 text-blue-600" />
-          <div className="font-mono text-slate-900" style={{ fontSize: '2rem', lineHeight: '1' }}>
-            {currentTime.toLocaleTimeString('es-ES')}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 bg-blue-50 px-6 py-3 rounded-xl border border-blue-100">
+            <Clock className="w-6 h-6 text-blue-600" />
+            <div className="font-mono text-slate-900" style={{ fontSize: '2rem', lineHeight: '1' }}>
+              {currentTime.toLocaleTimeString('es-ES')}
+            </div>
           </div>
+
+          <Button
+            onClick={onOpenConfig}
+            variant="outline"
+            size="icon"
+            className="h-12 w-12 rounded-xl border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+          >
+            <Settings className="w-5 h-5 text-slate-600" />
+          </Button>
         </div>
       </div>
     </div>

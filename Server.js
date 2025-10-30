@@ -31,6 +31,51 @@ db.connect((err) => {
 });
 
 // ============================================================
+// 🔐 LOGIN DE ADMINISTRADORES
+// ============================================================
+import bcrypt from "bcrypt"; // asegúrate de instalarlo con: npm install bcrypt
+
+app.post("/api/login", (req, res) => {
+  const { correo, contraseña } = req.body;
+
+  if (!correo || !contraseña) {
+    return res.status(400).json({ error: "Faltan datos obligatorios" });
+  }
+
+  const query = `
+    SELECT * FROM administradores WHERE Correo_Administrador = ?
+  `;
+
+  db.query(query, [correo], async (err, results) => {
+    if (err) {
+      console.error("❌ Error al consultar el administrador:", err);
+      return res.status(500).json({ error: "Error interno del servidor" });
+    }
+
+    if (results.length === 0) {
+      return res.status(401).json({ error: "Correo no encontrado" });
+    }
+
+    const admin = results[0];
+
+    // ✅ Comparar contraseñas (hash vs texto plano)
+    const isMatch = await bcrypt.compare(contraseña, admin.Contraseña_Administrador);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Contraseña incorrecta" });
+    }
+
+    // ✅ Enviar datos seguros del administrador
+    res.json({
+      idAdministrador: admin.idAdministrador,
+      nombre: admin.Nombre_Administrador,
+      apellido: admin.Apellido_Administrador,
+      correo: admin.Correo_Administrador,
+    });
+  });
+});
+
+// ============================================================
 // 🧾 ENDPOINT: Registrar un acceso
 // ============================================================
 app.post("/api/accesos", (req, res) => {
@@ -59,16 +104,28 @@ app.post("/api/accesos", (req, res) => {
 // ======================================================
 // 🔹 Obtener lista de zonas (incluye nivel de seguridad)
 // ======================================================
-app.get("/api/zonas", (req, res) => {
+app.get('/api/zonas', (req, res) => {
   const sql = `
-    SELECT idZona, Nombre_Zona, nivel_seguridad_zona
+    SELECT 
+      idzonas,
+      nombre_zona,
+      nivel_seguridad_zona,
+      capacidad_maxima_zona,
+      horario_inicio_zona,
+      horario_fin_zona,
+      descripcion_zona,
+      estado_zona,
+      requiresEscort
     FROM zonas
   `;
+
   db.query(sql, (err, results) => {
     if (err) {
-      console.error("❌ Error al obtener zonas:", err);
-      return res.status(500).json({ error: "Error al obtener zonas" });
+      console.error('❌ Error al obtener zonas:', err);
+      return res.status(500).json({ error: 'Error al obtener zonas' });
     }
+
+    console.log('✅ Zonas obtenidas correctamente:', results.length);
     res.json(results);
   });
 });
@@ -92,9 +149,9 @@ app.post("/api/dispositivo", (req, res) => {
 
   // 🔸 Obtener datos de la zona (nombre y nivel de seguridad)
   const zonaQuery = `
-    SELECT Nombre_Zona, nivel_seguridad_zona 
+    SELECT nombre_zona, nivel_seguridad_zona 
     FROM zonas 
-    WHERE idZona = ?
+    WHERE idzonas = ?
   `;
   db.query(zonaQuery, [Idzona_dispositivo], (errZona, zonaResults) => {
     if (errZona) {
@@ -199,6 +256,30 @@ app.post("/api/dispositivo", (req, res) => {
         );
       }
     });
+  });
+});
+// ============================================================
+// 🧾 REGISTRO DE AUDITORÍA
+// ============================================================
+app.post("/api/auditoria", (req, res) => {
+  const { usuario_id, accion, entidad, entidad_id, detalle } = req.body;
+
+  if (!usuario_id || !accion || !entidad || !detalle) {
+    return res.status(400).json({ error: "Faltan datos obligatorios en la auditoría" });
+  }
+
+  const query = `
+    INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle, fecha)
+    VALUES (?, ?, ?, ?, ?, NOW())
+  `;
+
+  db.query(query, [usuario_id, accion, entidad, entidad_id || null, detalle], (err, result) => {
+    if (err) {
+      console.error("❌ Error al registrar auditoría:", err);
+      return res.status(500).json({ error: "Error al registrar auditoría" });
+    }
+    console.log(`🧾 Auditoría registrada -> ${accion} en ${entidad}`);
+    res.json({ message: "Auditoría registrada correctamente" });
   });
 });
 

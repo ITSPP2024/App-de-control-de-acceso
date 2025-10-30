@@ -6,7 +6,6 @@ import { WelcomeMessage } from './components/WelcomeMessage';
 import { ConfigModal } from './components/ConfigModal';
 import { Toaster } from './components/ui/sonner';
 
-
 // Mock user database
 const mockUsers = [
   'Juan Pérez',
@@ -17,8 +16,20 @@ const mockUsers = [
   'Sofia Ramírez',
 ];
 
+export type Zone = {
+  idzonas: number;
+  nombre_zona: string;
+  nivel_seguridad_zona: string;
+  capacidad_maxima_zona: number;
+  horario_inicio_zona: string;
+  horario_fin_zona: string;
+  descripcion_zona: string;
+  estado_zona: string;
+  requiresEscort: number;
+};
+
 export default function App() {
-  const [currentZone, setCurrentZone] = useState('Laboratorio 1');
+  const [currentZone, setCurrentZone] = useState<Zone | null>(null);
   const [accessType, setAccessType] = useState<'entrada' | 'salida'>('entrada');
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
@@ -28,14 +39,9 @@ export default function App() {
   });
 
   const handleAccessGranted = (method: string) => {
-    // Simulate getting a random user from the database
     const randomUser = mockUsers[Math.floor(Math.random() * mockUsers.length)];
     setCurrentUser(randomUser);
-    
-    // Clear user after 5 seconds
-    setTimeout(() => {
-      setCurrentUser(null);
-    }, 5000);
+    setTimeout(() => setCurrentUser(null), 5000);
   };
 
   return (
@@ -51,17 +57,16 @@ export default function App() {
       />
       
       <div className="h-full flex flex-col p-6 gap-6">
-        {/* Header */}
         <div className="flex-shrink-0">
           <AccessControlHeader 
-            zone={currentZone} 
+            zone={currentZone?.nombre_zona || ''}
+            zoneDescription={currentZone?.descripcion_zona || ''}
+            accessLevel={currentZone?.nivel_seguridad_zona || '1'}
             onOpenConfig={() => setConfigOpen(true)}
           />
         </div>
 
-        {/* Main Content */}
         <div className="flex-1 grid grid-cols-3 gap-6 min-h-0">
-          {/* Left Column - Access Type & Scanner Panel */}
           <div className="flex flex-col gap-6 min-h-0">
             <div className="flex-shrink-0">
               <AccessTypeSelector 
@@ -77,7 +82,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Column - Welcome Message (Large) */}
           <div className="col-span-2 min-h-0">
             <WelcomeMessage 
               userName={currentUser} 

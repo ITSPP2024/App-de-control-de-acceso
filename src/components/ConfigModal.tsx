@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,28 +6,29 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { Lock, MapPin, Fingerprint, CreditCard } from 'lucide-react';
+type Zone = {
+  idzonas: number;
+  nombre_zona: string;
+  nivel_seguridad_zona: string;
+  capacidad_maxima_zona: number;
+  horario_inicio_zona: string;
+  horario_fin_zona: string;
+  descripcion_zona: string;
+  estado_zona: string;
+  requiresEscort: number;
+};
 
 interface ConfigModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentZone: string;
-  onZoneChange: (zone: string) => void;
+  currentZone: Zone | null;
+  onZoneChange: (zone: Zone) => void;
   enabledDevices: {
     card: boolean;
     fingerprint: boolean;
   };
   onDevicesChange: (devices: { card: boolean; fingerprint: boolean }) => void;
 }
-
-const zones = [
-  'Laboratorio 1',
-  'Laboratorio 2',
-  'Laboratorio 3',
-  'Sala de Servidores',
-  'Oficina Principal',
-  'Área de Almacenamiento',
-  'Recepción',
-];
 
 export function ConfigModal({ 
   open, 
@@ -42,21 +42,54 @@ export function ConfigModal({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+const [zones, setZones] = useState<Zone[]>([]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // 🔹 Cargar zonas dinámicamente desde el backend
+  useEffect(() => {
+    if (isAuthenticated) {
+    fetch('http://localhost:5002/api/zonas')
+      .then(res => res.json())
+      .then((data: Zone[]) => {
+        setZones(data);
+        if (!currentZone && data.length > 0) onZoneChange(data[0]); // Default
+      })
+      .catch(err => console.error('Error al obtener zonas:', err));
+  }
+  }, [isAuthenticated]);
+
+  // 🔹 Inicio de sesión con conexión a la base de datos
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication - usuario: admin, contraseña: admin123
-    if (username === 'admin' && password === 'admin123') {
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5002/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: username,
+          contraseña: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Error al iniciar sesión');
+        return;
+      }
+
+      console.log('✅ Admin autenticado:', data);
       setIsAuthenticated(true);
-      setError('');
-    } else {
-      setError('Usuario o contraseña incorrectos');
+    } catch (err) {
+      console.error('Error de conexión:', err);
+      setError('No se pudo conectar con el servidor');
     }
   };
 
   const handleClose = () => {
     onOpenChange(false);
-    // Reset authentication state after closing
+    // Resetear estado tras cerrar
     setTimeout(() => {
       setIsAuthenticated(false);
       setUsername('');
@@ -76,7 +109,7 @@ export function ConfigModal({
         </DialogHeader>
 
         {!isAuthenticated ? (
-          // Login Form
+          // 🔹 Formulario de Login
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Usuario</Label>
@@ -106,13 +139,6 @@ export function ConfigModal({
               <p className="text-red-600 text-sm">{error}</p>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-slate-600">
-                <span className="text-blue-700">Usuario:</span> admin<br />
-                <span className="text-blue-700">Contraseña:</span> admin123
-              </p>
-            </div>
-
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
                 Cancelar
@@ -123,29 +149,35 @@ export function ConfigModal({
             </div>
           </form>
         ) : (
-          // Configuration Form
+          // 🔹 Formulario de Configuración
           <div className="space-y-6">
-            {/* Zone Selection */}
+            {/* Selección de Zona */}
             <div className="space-y-3">
               <Label className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-blue-600" />
                 Zona Actual
               </Label>
-              <Select value={currentZone} onValueChange={onZoneChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccione una zona" />
-                </SelectTrigger>
-                <SelectContent>
-                  {zones.map((zone) => (
-                    <SelectItem key={zone} value={zone}>
-                      {zone}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Select 
+  value={currentZone?.idzonas.toString() || ''} 
+  onValueChange={(id) => {
+    const zone = zones.find(z => z.idzonas.toString() === id);
+    if (zone) onZoneChange(zone);
+  }}
+>
+  <SelectTrigger className="w-full">
+    <SelectValue placeholder="Seleccione una zona" />
+  </SelectTrigger>
+  <SelectContent>
+    {zones.map((zone) => (
+      <SelectItem key={zone.idzonas} value={zone.idzonas.toString()}>
+        {zone.nombre_zona}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
             </div>
 
-            {/* Device Selection */}
+            {/* Dispositivos */}
             <div className="space-y-3">
               <Label>Dispositivos de Escaneo</Label>
               <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -193,8 +225,33 @@ export function ConfigModal({
               >
                 Cerrar
               </Button>
-              <Button 
-                onClick={handleClose}
+
+              <Button
+                onClick={async () => {
+                  try {
+                    const usuario_id = 1; // 🔸 Temporal hasta que el login devuelva el ID real
+                    const detalle = `Configuró la zona "${currentZone}" con los dispositivos: ${
+                      enabledDevices.card ? "Tarjeta" : ""
+                    } ${enabledDevices.fingerprint ? "Huellas" : ""}`;
+
+                    await fetch("http://localhost:5002/api/auditoria", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        usuario_id,
+                        accion: "CONFIGURAR",
+                        entidad: "SISTEMA",
+                        entidad_id: null,
+                        detalle,
+                      }),
+                    });
+
+                    console.log("✅ Auditoría registrada");
+                    handleClose();
+                  } catch (err) {
+                    console.error("Error al registrar auditoría:", err);
+                  }
+                }}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
                 Guardar Configuración

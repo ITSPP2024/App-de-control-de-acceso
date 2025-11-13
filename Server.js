@@ -111,11 +111,10 @@ app.post("/api/accesos", (req, res) => {
     res.json({ message: "Acceso registrado correctamente" });
   });
 });
-
 // ======================================================
-// 🔹 Obtener lista de zonas (incluye nivel de seguridad)
+// 🔹 Obtener lista de zonas
 // ======================================================
-app.get('/api/zonas', (req, res) => {
+app.get("/api/zonas", (req, res) => {
   const sql = `
     SELECT 
       idzonas,
@@ -132,15 +131,33 @@ app.get('/api/zonas', (req, res) => {
 
   db.query(sql, (err, results) => {
     if (err) {
-      console.error('❌ Error al obtener zonas:', err);
-      return res.status(500).json({ error: 'Error al obtener zonas' });
+      console.error("❌ Error al obtener zonas:", err);
+      return res.status(500).json({ error: "Error al obtener zonas" });
     }
 
-    console.log('✅ Zonas obtenidas correctamente:', results.length);
+    console.log("✅ Zonas obtenidas correctamente:", results.length);
     res.json(results);
   });
 });
 
+// ======================================================
+// 🔹 Obtener lista de dispositivos (separado correctamente)
+// ======================================================
+app.get("/api/dispositivos", (req, res) => {
+  const query = `
+    SELECT idDispositivo, nombre_dispositivo
+    FROM dispositivo
+    WHERE Estado = 'Activo'
+  `;
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("❌ Error al obtener dispositivos:", err);
+      return res.status(500).json({ error: "Error al obtener dispositivos" });
+    }
+    console.log("✅ Dispositivos obtenidos:", results.length);
+    res.json(results);
+  });
+});
 // ======================================================
 // 🔹 Registrar o vincular dispositivo
 // ======================================================
@@ -158,10 +175,10 @@ app.post("/api/dispositivo", (req, res) => {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
-  // 🔸 Obtener datos de la zona (nombre y nivel de seguridad)
+  // 🔸 Obtener datos de la zona
   const zonaQuery = `
-    SELECT nombre_zona, nivel_seguridad_zona 
-    FROM zonas 
+    SELECT nombre_zona
+    FROM zonas
     WHERE idzonas = ?
   `;
   db.query(zonaQuery, [Idzona_dispositivo], (errZona, zonaResults) => {
@@ -174,7 +191,7 @@ app.post("/api/dispositivo", (req, res) => {
       return res.status(404).json({ error: "Zona no encontrada" });
     }
 
-    const { Nombre_Zona, nivel_seguridad_zona } = zonaResults[0];
+    const { nombre_zona } = zonaResults[0];
 
     // 🔹 Verificar si el dispositivo ya existe
     const checkQuery = "SELECT * FROM dispositivo WHERE nombre_dispositivo = ?";
@@ -185,29 +202,27 @@ app.post("/api/dispositivo", (req, res) => {
       }
 
       // ======================================================
-      // 🟢 Si el dispositivo ya existe → actualizar zona y datos
+      // 🟢 Si el dispositivo ya existe → actualizar
       // ======================================================
       if (results.length > 0) {
         const updateQuery = `
           UPDATE dispositivo
           SET 
+            tipo_dispositivo = ?, 
             Idzona_dispositivo = ?, 
             nombre_zona_dispositivo = ?, 
-            tipo_dispositivo = ?, 
             ubicacion = ?, 
-            Estado = ?,
-            nivel_seguridad_zona = ?
+            Estado = ?
           WHERE nombre_dispositivo = ?
         `;
         db.query(
           updateQuery,
           [
-            Idzona_dispositivo, 
-            Nombre_Zona, 
-            tipo_dispositivo || results[0].tipo_dispositivo, 
-            ubicacion || results[0].ubicacion, 
-            Estado || results[0].Estado, 
-            nivel_seguridad_zona,
+            tipo_dispositivo || results[0].tipo_dispositivo,
+            Idzona_dispositivo,
+            nombre_zona,
+            ubicacion || results[0].ubicacion,
+            Estado || results[0].Estado,
             nombre_dispositivo
           ],
           (err2) => {
@@ -217,14 +232,14 @@ app.post("/api/dispositivo", (req, res) => {
             }
 
             // Registrar auditoría
-            const detalle = `Actualizó el dispositivo "${nombre_dispositivo}" vinculado a la zona "${Nombre_Zona}" (Nivel ${nivel_seguridad_zona})`;
+            const detalle = `Actualizó el dispositivo "${nombre_dispositivo}" vinculado a la zona "${nombre_zona}"`;
             const auditQuery = `
               INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle, fecha)
               VALUES (?, 'ACTUALIZAR', 'DISPOSITIVO', ?, ?, NOW())
             `;
             db.query(auditQuery, [creado_por, results[0].idDispositivo, detalle]);
 
-            res.json({ message: "✅ Dispositivo actualizado correctamente y auditoría registrada" });
+            res.json({ message: "✅ Dispositivo actualizado correctamente" });
           }
         );
       } 
@@ -234,8 +249,8 @@ app.post("/api/dispositivo", (req, res) => {
       else {
         const insertQuery = `
           INSERT INTO dispositivo 
-          (nombre_dispositivo, tipo_dispositivo, Idzona_dispositivo, nombre_zona_dispositivo, ubicacion, Estado, nivel_seguridad_zona)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          (nombre_dispositivo, tipo_dispositivo, Idzona_dispositivo, nombre_zona_dispositivo, ubicacion, Estado)
+          VALUES (?, ?, ?, ?, ?, ?)
         `;
         db.query(
           insertQuery,
@@ -243,10 +258,9 @@ app.post("/api/dispositivo", (req, res) => {
             nombre_dispositivo, 
             tipo_dispositivo || "Lector biométrico", 
             Idzona_dispositivo, 
-            Nombre_Zona, 
+            nombre_zona, 
             ubicacion || "Sin definir", 
-            Estado || "Activo",
-            nivel_seguridad_zona
+            Estado || "Activo"
           ],
           (err3, result) => {
             if (err3) {
@@ -255,7 +269,7 @@ app.post("/api/dispositivo", (req, res) => {
             }
 
             // Registrar auditoría
-            const detalle = `Registró nuevo dispositivo "${nombre_dispositivo}" en zona "${Nombre_Zona}" (Nivel ${nivel_seguridad_zona})`;
+            const detalle = `Registró nuevo dispositivo "${nombre_dispositivo}" en zona "${nombre_zona}"`;
             const auditQuery = `
               INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle, fecha)
               VALUES (?, 'CREAR', 'DISPOSITIVO', ?, ?, NOW())
@@ -269,6 +283,7 @@ app.post("/api/dispositivo", (req, res) => {
     });
   });
 });
+
 // ============================================================
 // 🧾 REGISTRO DE AUDITORÍA
 // ============================================================
@@ -477,6 +492,259 @@ app.get("/api/test-ttlock", async (req, res) => {
     });
   }
 });
+import WebSocket from 'ws'; // npm i ws
+// -----------------------
+// Helper: validar usuario por huella o tarjeta
+// -----------------------
+async function findUserByFingerprintOrCard(db, fingerprintNameOrCardId) {
+  // fingerprintNameOrCardId: puede venir como "Nombre Apellido" o un id de tarjeta
+  // Buscamos por nombre completo (nombre + apellido) o por huella_usuario o targeta_usuario
+  const [rows] = await db.query(
+    `SELECT * FROM usuarios WHERE 
+       CONCAT(nombre_usuario, ' ', apellido_usuario) = ? 
+       OR huella_usuario = ? 
+       OR targeta_usuario = ? 
+       LIMIT 1`,
+    [fingerprintNameOrCardId, fingerprintNameOrCardId, fingerprintNameOrCardId]
+  );
+  return rows[0] || null;
+}
+
+// -----------------------
+// Helper: obtener zona actual (la asignada en la app / desktop)
+// -----------------------
+async function getCurrentZoneForDevice(db, deviceId) {
+  // Si el dispositivo (cerradura) está vinculado con Idzona_dispositivo en la tabla dispositivo
+  const [rows] = await db.query(
+    `SELECT z.* FROM dispositivo d 
+       LEFT JOIN zonas z ON d.Idzona_dispositivo = z.idzonas
+       WHERE d.idDispositivo = ? LIMIT 1`,
+    [deviceId]
+  );
+  return rows[0] || null;
+}
+
+// -----------------------
+// Helper: comprobar horario y nivel
+// -----------------------
+function isWithinSchedule(zone, now = new Date()) {
+  if (!zone || !zone.horario_inicio_zona || !zone.horario_fin_zona) return true; // si no tiene horario definido, asumimos OK
+  // horario_inicio_zona y horario_fin_zona se guardan como "HH:MM:SS" o TIME
+  const pad = s => (s.length === 1 ? '0'+s : s);
+  const toSeconds = (hms) => {
+    const [h, m, s] = (''+hms).split(':').map(x => parseInt(x,10) || 0);
+    return h*3600 + m*60 + s;
+  };
+  const secondsNow = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+  const start = toSeconds(zone.horario_inicio_zona);
+  const end = toSeconds(zone.horario_fin_zona);
+
+  if (start <= end) return secondsNow >= start && secondsNow <= end;
+  // periodo que cruza medianoche
+  return secondsNow >= start || secondsNow <= end;
+}
+
+function hasRequiredLevel(user, zone) {
+  if (!zone || !zone.nivel_seguridad_zona) return true;
+  // asumo nivel_seguridad_zona es numérico en string; adaptar si es distinto
+  const zoneLevel = parseInt(zone.nivel_seguridad_zona, 10) || 1;
+  const userLevel = parseInt(user?.nivel_acceso || 0, 10) || 0;
+  return userLevel >= zoneLevel;
+}
+
+// -----------------------
+// Registrar acceso en BD
+// -----------------------
+async function registerAccess(db, {
+  userId = null,
+  zoneId = null,
+  tipo_acceso = 'Huella',
+  tipo_dispositivo_acceso = 'TTLock WiFi',
+  deviceId = null,
+  estado_acceso = 'Denegado',
+  motivo = null,
+  tarjeta_id = null,
+}) {
+  await db.query(
+    `INSERT INTO acceso 
+      (idUsuario, idZona, tipo_acceso, tipo_dispositivo_acceso, idDispositivo, estado_acceso, motivo_rechazo_acceso, tarjeta_id, fecha_inicio_acceso)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [userId, zoneId, tipo_acceso, tipo_dispositivo_acceso, deviceId, estado_acceso, motivo, tarjeta_id]
+  );
+}
+
+// -----------------------
+// Función para intentar unlock vía TTLock Cloud API (si tienes Gateway emparejado)
+
+async function unlockViaCloud(lockId, pool /* o contexto */) {
+  // requisito: getAccessToken() que ya has en tu server.js (usa md5)
+  try {
+    const token = await getAccessToken(); // reuse función que tienes
+    const res = await axios.post(`${process.env.TTLOCK_BASE_URL}/v3/lock/unlock`, qs.stringify({
+      clientId: process.env.TTLOCK_CLIENT_ID,
+      accessToken: token,
+      lockId,
+      date: Date.now(),
+    }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }});
+    return res.data;
+  } catch (err) {
+    console.error('unlockViaCloud error:', err.response?.data || err.message);
+    throw err;
+  }
+}
+
+// -----------------------
+// WebSocket server para bridge móvil (si usas app puente)
+// -----------------------
+let wss;
+function startBridgeWsServer(httpServer) {
+  // Si ya tienes app.listen(PORT), puedes crear un WS server en paralelo:
+  wss = new WebSocket.Server({ server: httpServer, path: '/bridge' });
+  wss.on('connection', (ws) => {
+    console.log('📡 Bridge conectado (mobile)');
+
+    ws.on('message', (msg) => {
+      try {
+        const parsed = JSON.parse(msg.toString());
+        console.log('Bridge ->', parsed);
+        // manejar eventos desde bridge si hace confirmaciones
+      } catch (e) {}
+    });
+
+    ws.on('close', () => console.log('📴 Bridge desconectado'));
+  });
+}
+
+// helper para enviar a todos bridges conectados
+function notifyBridges(payload) {
+  if (!wss) return;
+  const data = JSON.stringify(payload);
+  wss.clients.forEach((c) => {
+    if (c.readyState === WebSocket.OPEN) c.send(data);
+  });
+}
+
+// -----------------------
+// Endpoint: recibir evento de TTLock (callback) o procesar cuando polling detecta intento
+// -----------------------
+app.post('/api/ttlock/callback', async (req, res) => {
+  try {
+    const data = req.body;
+    // Si TTLock envía `records` con json string, parsea
+    let record = null;
+    if (data.records) {
+      try { record = JSON.parse(data.records)[0]; } catch(e) { record = null; }
+    }
+
+    const lockId = data.lockId || record?.lockId;
+    const usernameFromLock = data.username || record?.username || record?.fingerprintName || record?.cardName || null;
+    const deviceId = lockId;
+
+    // 1) obtener zona vinculada al dispositivo
+    const currentZone = await getCurrentZoneForDevice(db, deviceId);
+
+    // 2) buscar usuario (por huella o por nombre)
+    const user = usernameFromLock ? await findUserByFingerprintOrCard(db, usernameFromLock) : null;
+
+    // 3) validar horarios y nivel
+    let estado = 'Denegado';
+    let motivo = 'Usuario no autorizado';
+    if (user) {
+      if (!isWithinSchedule(currentZone)) {
+        estado = 'Denegado';
+        motivo = 'Fuera de horario';
+      } else if (!hasRequiredLevel(user, currentZone)) {
+        estado = 'Denegado';
+        motivo = 'Nivel de acceso insuficiente';
+      } else {
+        estado = 'Autorizado';
+        motivo = null;
+      }
+    } else {
+      estado = 'Denegado';
+      motivo = 'Usuario no encontrado';
+    }
+
+    // 4) registrar intento
+    await registerAccess(db, {
+      userId: user?.idUsuarios || null,
+      zoneId: currentZone?.idzonas || null,
+      tipo_acceso: record?.type || 'Huella',
+      tipo_dispositivo_acceso: 'TTLock Callback',
+      deviceId,
+      estado_acceso: estado,
+      motivo,
+      tarjeta_id: record?.cardNumber || null,
+    });
+
+    // 5) Si autorizado -> abrir (si hay Gateway/cloud) o notificar bridge para abrir
+    if (estado === 'Autorizado') {
+      // preferencia: intentar Cloud unlock si tienes gateway
+      try {
+        if (process.env.HAS_GATEWAY === 'true') {
+          await unlockViaCloud(deviceId, db);
+          console.log('🔓 Unlock via Cloud solicitado');
+        } else {
+          // notificar bridge móvil: payload puede contener lockId, action, requestId...
+          notifyBridges({ action: 'unlock', lockId: deviceId, idUsuario: user?.idUsuarios || null });
+          console.log('📣 Notificado a bridge para unlock');
+        }
+      } catch (err) {
+        console.error('Error al intentar desbloquear tras autorización:', err.response?.data || err.message);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error procesando callback:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// -----------------------
+// Polling fallback: revisar lockRecord/list periódicamente y procesar nuevos eventos
+// -----------------------
+let lastRecordTimestamp = 0;
+async function pollLockRecordsPeriodically(db, intervalMs = 30000) {
+  console.log('🔁 Iniciando polling de lockRecord/list cada', intervalMs/1000,'s');
+  setInterval(async () => {
+    try {
+      const token = await getAccessToken();
+      const res = await axios.get(`${process.env.TTLOCK_BASE_URL}/v3/lockRecord/list`, {
+        params: {
+          clientId: process.env.TTLOCK_CLIENT_ID,
+          accessToken: token,
+          lockId: process.env.TTLOCK_LOCK_ID,
+          pageNo: 1,
+          pageSize: 200,
+          date: Date.now(),
+          // opcionalmente: startTime, endTime filters según API
+        },
+      });
+
+      const list = res.data.list || [];
+      for (const rec of list) {
+        // rec.createDate (ms) o rec.date — dependerá de la respuesta
+        const timestamp = rec.createDate || rec.date || Date.now();
+        if (timestamp <= lastRecordTimestamp) continue;
+        lastRecordTimestamp = Math.max(lastRecordTimestamp, timestamp);
+        // mapear rec a estructura esperada y llamar al mismo handler que callback
+        // construimos un objeto similar al callback
+        const faux = {
+          records: JSON.stringify([rec]),
+          lockId: rec.lockId,
+          username: rec.senderUsername || rec.fingerprintName || rec.cardName || null,
+        };
+        // Llamar al handler reusando el endpoint internamente:
+        await axios.post(`http://localhost:${PORT}/api/ttlock/callback`, faux).catch(e => {
+          console.error('Error interno procesando registro:', e.response?.data || e.message);
+        });
+      }
+    } catch (err) {
+      console.error('Polling lockRecord error:', err.response?.data || err.message);
+    }
+  }, intervalMs);
+}
 
 // ============================================================
 // 🚀 INICIAR SERVIDOR
@@ -484,3 +752,4 @@ app.get("/api/test-ttlock", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🟢 Servidor de escritorio corriendo en http://localhost:${PORT}`);
 });
+pollLockRecordsPeriodically(db, 30000);

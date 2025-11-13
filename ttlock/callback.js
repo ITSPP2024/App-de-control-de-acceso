@@ -12,6 +12,9 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
 });
+// Guarda el último registro procesado en memoria
+let lastProcessedId = 0;  // o podrías usar fecha si prefieres
+
 // 📬 Callback TTLock
 router.post("/", async (req, res) => {
   try {
@@ -38,6 +41,15 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ success: false, message: "Falta lockId" });
     }
 
+    // 🔹 Evitar reprocesar eventos viejos
+    if (lockId <= lastProcessedId) {
+      console.log(`⚠️ Evento antiguo ignorado (lockId ${lockId}).`);
+      return res.json({ success: true, message: "Evento repetido ignorado" });
+    }
+
+    // ✅ Actualizamos el último ID procesado
+    lastProcessedId = lockId;
+
     // ✅ Registrar/actualizar dispositivo
     const [rows] = await pool.query(
       "SELECT * FROM dispositivo WHERE idDispositivo = ?",
@@ -61,19 +73,17 @@ router.post("/", async (req, res) => {
       console.log(`🔄 Cerradura ${lockId} actualizada.`);
     }
 
-    // 🔹 Obtener usuario por huella o nombre **aquí dentro**
+    // 🔹 Obtener usuario
     const [userRows] = await pool.query(
       "SELECT * FROM usuarios WHERE CONCAT(nombre_usuario, ' ', apellido_usuario) = ? OR huella_usuario = ?",
       [data.username || record?.username, data.username || record?.username]
     );
     const user = userRows[0] || null;
 
-    // 🔹 Validar acceso según zona y nivel de seguridad
+    const currentZone = null;
     let estadoAcceso = "Denegado";
     let motivo = "Usuario no autorizado";
 
-    // ⚠️ currentZone debería venir de tu lógica de zona, ej:
-    const currentZone = null; // placeholder, luego obtienes la zona real
     if (user && currentZone) {
       if (user.nivel_acceso >= currentZone.nivel_seguridad_zona) {
         estadoAcceso = "Autorizado";
@@ -99,13 +109,14 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    console.log(`📝 Registro de acceso TTLock guardado correctamente.`);
-
+    console.log(`📝 Registro nuevo TTLock guardado (lockId ${lockId}).`);
     res.json({ success: true });
+
   } catch (error) {
     console.error("❌ Error en callback TTLock:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 
 export default router;

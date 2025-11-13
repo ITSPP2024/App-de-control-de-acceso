@@ -5,7 +5,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-import { Lock, MapPin, Fingerprint, CreditCard } from 'lucide-react';
+import { Lock, MapPin, Fingerprint, CreditCard, Cpu } from 'lucide-react';
+
 type Zone = {
   idzonas: number;
   nombre_zona: string;
@@ -16,6 +17,11 @@ type Zone = {
   descripcion_zona: string;
   estado_zona: string;
   requiresEscort: number;
+};
+
+type Device = {
+  idDispositivo: number;
+  nombre_dispositivo: string;
 };
 
 interface ConfigModalProps {
@@ -30,34 +36,41 @@ interface ConfigModalProps {
   onDevicesChange: (devices: { card: boolean; fingerprint: boolean }) => void;
 }
 
-export function ConfigModal({ 
-  open, 
-  onOpenChange, 
-  currentZone, 
+export function ConfigModal({
+  open,
+  onOpenChange,
+  currentZone,
   onZoneChange,
   enabledDevices,
-  onDevicesChange 
+  onDevicesChange,
 }: ConfigModalProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-const [zones, setZones] = useState<Zone[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>('');
 
-  // 🔹 Cargar zonas dinámicamente desde el backend
+  // 🔹 Cargar zonas y dispositivos al iniciar sesión
   useEffect(() => {
     if (isAuthenticated) {
-    fetch('http://localhost:5002/api/zonas')
-      .then(res => res.json())
-      .then((data: Zone[]) => {
-        setZones(data);
-        if (!currentZone && data.length > 0) onZoneChange(data[0]); // Default
-      })
-      .catch(err => console.error('Error al obtener zonas:', err));
-  }
+      fetch('http://localhost:5002/api/zonas')
+        .then((res) => res.json())
+        .then((data: Zone[]) => {
+          setZones(data);
+          if (!currentZone && data.length > 0) onZoneChange(data[0]);
+        })
+        .catch((err) => console.error('Error al obtener zonas:', err));
+
+      fetch('http://localhost:5002/api/dispositivos')
+        .then((res) => res.json())
+        .then((data: Device[]) => setDevices(data))
+        .catch((err) => console.error('Error al obtener dispositivos:', err));
+    }
   }, [isAuthenticated]);
 
-  // 🔹 Inicio de sesión con conexión a la base de datos
+  // 🔹 Inicio de sesión
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -73,13 +86,11 @@ const [zones, setZones] = useState<Zone[]>([]);
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         setError(data.error || 'Error al iniciar sesión');
         return;
       }
 
-      console.log('✅ Admin autenticado:', data);
       setIsAuthenticated(true);
     } catch (err) {
       console.error('Error de conexión:', err);
@@ -89,13 +100,51 @@ const [zones, setZones] = useState<Zone[]>([]);
 
   const handleClose = () => {
     onOpenChange(false);
-    // Resetear estado tras cerrar
     setTimeout(() => {
       setIsAuthenticated(false);
       setUsername('');
       setPassword('');
       setError('');
+      setSelectedDevice('');
     }, 300);
+  };
+
+  // 🔹 Guardar configuración y vincular dispositivo con zona
+  const handleSave = async () => {
+    if (!currentZone || !selectedDevice) {
+      alert('Seleccione una zona y un dispositivo');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5002/api/dispositivo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Idzona_dispositivo: currentZone.idzonas,
+          nombre_dispositivo: devices.find((d) => d.idDispositivo.toString() === selectedDevice)?.nombre_dispositivo,
+          tipo_dispositivo: 'Lector biométrico',
+          ubicacion: currentZone.nombre_zona,
+          Estado: 'Activo',
+          creado_por: 1, // 🔸 Temporal hasta que login devuelva ID real
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error al vincular dispositivo:', data);
+        alert('❌ Error al vincular dispositivo: ' + data.error);
+        return;
+      }
+
+      console.log('✅', data.message);
+      alert('✅ Configuración guardada y dispositivo vinculado correctamente');
+      handleClose();
+    } catch (err) {
+      console.error('Error de conexión:', err);
+      alert('❌ Error al guardar la configuración');
+    }
   };
 
   return (
@@ -109,38 +158,29 @@ const [zones, setZones] = useState<Zone[]>([]);
         </DialogHeader>
 
         {!isAuthenticated ? (
-          // 🔹 Formulario de Login
+          // 🔹 Login
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuario</Label>
+              <Label>Usuario</Label>
               <Input
-                id="username"
                 type="text"
                 placeholder="Ingrese su usuario"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label>Contraseña</Label>
               <Input
-                id="password"
                 type="password"
                 placeholder="Ingrese su contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
               />
             </div>
-
-            {error && (
-              <p className="text-red-600 text-sm">{error}</p>
-            )}
-
+            {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+              <Button variant="outline" onClick={handleClose} className="flex-1">
                 Cancelar
               </Button>
               <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">
@@ -149,7 +189,7 @@ const [zones, setZones] = useState<Zone[]>([]);
             </div>
           </form>
         ) : (
-          // 🔹 Formulario de Configuración
+          // 🔹 Configuración
           <div className="space-y-6">
             {/* Selección de Zona */}
             <div className="space-y-3">
@@ -157,59 +197,73 @@ const [zones, setZones] = useState<Zone[]>([]);
                 <MapPin className="w-4 h-4 text-blue-600" />
                 Zona Actual
               </Label>
-              <Select 
-  value={currentZone?.idzonas.toString() || ''} 
-  onValueChange={(id) => {
-    const zone = zones.find(z => z.idzonas.toString() === id);
-    if (zone) onZoneChange(zone);
-  }}
->
-  <SelectTrigger className="w-full">
-    <SelectValue placeholder="Seleccione una zona" />
-  </SelectTrigger>
-  <SelectContent>
-    {zones.map((zone) => (
-      <SelectItem key={zone.idzonas} value={zone.idzonas.toString()}>
-        {zone.nombre_zona}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+              <Select
+                value={currentZone?.idzonas.toString() || ''}
+                onValueChange={(id) => {
+                  const zone = zones.find((z) => z.idzonas.toString() === id);
+                  if (zone) onZoneChange(zone);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccione una zona" />
+                </SelectTrigger>
+                <SelectContent>
+                  {zones.map((zone) => (
+                    <SelectItem key={zone.idzonas} value={zone.idzonas.toString()}>
+                      {zone.nombre_zona}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Dispositivos */}
+            {/* Selección de Dispositivo */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-green-600" />
+                Dispositivo Vinculado
+              </Label>
+              <Select
+                value={selectedDevice}
+                onValueChange={(id) => setSelectedDevice(id)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccione un dispositivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device.idDispositivo} value={device.idDispositivo.toString()}>
+                      {device.nombre_dispositivo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Dispositivos de Escaneo */}
             <div className="space-y-3">
               <Label>Dispositivos de Escaneo</Label>
               <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div className="flex items-center space-x-3">
                   <Checkbox
-                    id="card-device"
                     checked={enabledDevices.card}
                     onCheckedChange={(checked) =>
                       onDevicesChange({ ...enabledDevices, card: checked as boolean })
                     }
                   />
-                  <label
-                    htmlFor="card-device"
-                    className="flex items-center gap-2 cursor-pointer flex-1"
-                  >
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
                     <CreditCard className="w-5 h-5 text-blue-600" />
                     <span className="text-sm">Lector de Tarjetas</span>
                   </label>
                 </div>
-
                 <div className="flex items-center space-x-3">
                   <Checkbox
-                    id="fingerprint-device"
                     checked={enabledDevices.fingerprint}
                     onCheckedChange={(checked) =>
                       onDevicesChange({ ...enabledDevices, fingerprint: checked as boolean })
                     }
                   />
-                  <label
-                    htmlFor="fingerprint-device"
-                    className="flex items-center gap-2 cursor-pointer flex-1"
-                  >
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
                     <Fingerprint className="w-5 h-5 text-purple-600" />
                     <span className="text-sm">Lector de Huellas</span>
                   </label>
@@ -217,41 +271,13 @@ const [zones, setZones] = useState<Zone[]>([]);
               </div>
             </div>
 
+            {/* Botones */}
             <div className="flex gap-2 pt-2">
-              <Button 
-                variant="outline" 
-                onClick={handleClose} 
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={handleClose} className="flex-1">
                 Cerrar
               </Button>
-
               <Button
-                onClick={async () => {
-                  try {
-                    const usuario_id = 1; // 🔸 Temporal hasta que el login devuelva el ID real
-                    const detalle = `Configuró la zona "${currentZone}" con los dispositivos: ${
-                      enabledDevices.card ? "Tarjeta" : ""
-                    } ${enabledDevices.fingerprint ? "Huellas" : ""}`;
-
-                    await fetch("http://localhost:5002/api/auditoria", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        usuario_id,
-                        accion: "CONFIGURAR",
-                        entidad: "SISTEMA",
-                        entidad_id: null,
-                        detalle,
-                      }),
-                    });
-
-                    console.log("✅ Auditoría registrada");
-                    handleClose();
-                  } catch (err) {
-                    console.error("Error al registrar auditoría:", err);
-                  }
-                }}
+                onClick={handleSave}
                 className="flex-1 bg-green-600 hover:bg-green-700"
               >
                 Guardar Configuración

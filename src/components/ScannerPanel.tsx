@@ -4,7 +4,6 @@ import { CreditCard, Fingerprint, CheckCircle, XCircle } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from 'sonner';
 
 interface ScannerPanelProps {
   onAccessGranted: (method: string) => void;
@@ -16,58 +15,24 @@ interface ScannerPanelProps {
 
 type ScanStatus = 'idle' | 'scanning' | 'success' | 'denied';
 
-export function ScannerPanel({ onAccessGranted, enabledDevices }: ScannerPanelProps) {
+export function ScannerPanel({ enabledDevices }: ScannerPanelProps) {
   const [cardStatus, setCardStatus] = useState<ScanStatus>('idle');
   const [fingerprintStatus, setFingerprintStatus] = useState<ScanStatus>('idle');
 
+  // Solo animación visual
   const handleCardScan = () => {
     setCardStatus('scanning');
-    
-    setTimeout(() => {
-      const isGranted = Math.random() > 0.2; // 80% success rate
-      setCardStatus(isGranted ? 'success' : 'denied');
-      
-      if (isGranted) {
-        toast.success('Acceso Concedido', {
-          description: 'Tarjeta verificada correctamente'
-        });
-        onAccessGranted('Tarjeta');
-      } else {
-        toast.error('Acceso Denegado', {
-          description: 'Tarjeta no autorizada'
-        });
-      }
-      
-      setTimeout(() => setCardStatus('idle'), 3000);
-    }, 2000);
+    setTimeout(() => setCardStatus('idle'), 2000);
   };
 
   const handleFingerprintScan = () => {
     setFingerprintStatus('scanning');
-    
-    setTimeout(() => {
-      const isGranted = Math.random() > 0.2; // 80% success rate
-      setFingerprintStatus(isGranted ? 'success' : 'denied');
-      
-      if (isGranted) {
-        toast.success('Acceso Concedido', {
-          description: 'Huella verificada correctamente'
-        });
-        onAccessGranted('Huella');
-      } else {
-        toast.error('Acceso Denegado', {
-          description: 'Huella no reconocida'
-        });
-      }
-      
-      setTimeout(() => setFingerprintStatus('idle'), 3000);
-    }, 2000);
+    setTimeout(() => setFingerprintStatus('idle'), 2000);
   };
 
   return (
     <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200 p-6 shadow-sm">      
       <div className="flex flex-col gap-6 h-full">
-        {/* Card Scanner */}
         {enabledDevices.card && (
           <ScannerOption
             icon={CreditCard}
@@ -79,7 +44,6 @@ export function ScannerPanel({ onAccessGranted, enabledDevices }: ScannerPanelPr
           />
         )}
 
-        {/* Fingerprint Scanner */}
         {enabledDevices.fingerprint && (
           <ScannerOption
             icon={Fingerprint}
@@ -91,7 +55,6 @@ export function ScannerPanel({ onAccessGranted, enabledDevices }: ScannerPanelPr
           />
         )}
 
-        {/* No devices enabled message */}
         {!enabledDevices.card && !enabledDevices.fingerprint && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-slate-400">
@@ -141,104 +104,14 @@ function ScannerOption({ icon: Icon, title, description, status, onScan, color }
         status === 'scanning' ? `${colors.glow} shadow-xl` : 'shadow-md'
       }`}>
         <AnimatePresence mode="wait">
-          {status === 'idle' && (
-            <motion.div
-              key="idle"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <Icon className={`w-12 h-12 ${colors.text}`} />
-            </motion.div>
-          )}
-          
-          {status === 'scanning' && (
-            <motion.div
-              key="scanning"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              >
-                <Icon className={`w-12 h-12 ${colors.text}`} />
-              </motion.div>
-            </motion.div>
-          )}
-          
-          {status === 'success' && (
-            <motion.div
-              key="success"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <CheckCircle className="w-12 h-12 text-green-600" />
-            </motion.div>
-          )}
-          
-          {status === 'denied' && (
-            <motion.div
-              key="denied"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <XCircle className="w-12 h-12 text-red-600" />
-            </motion.div>
-          )}
+          {status === 'idle' && <motion.div key="idle" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}><Icon className={`w-12 h-12 ${colors.text}`} /></motion.div>}
+          {status === 'scanning' && <motion.div key="scanning" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}><motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}><Icon className={`w-12 h-12 ${colors.text}`} /></motion.div></motion.div>}
         </AnimatePresence>
-
-        {status === 'scanning' && (
-          <motion.div
-            className={`absolute inset-0 rounded-xl border-2 ${colors.border}`}
-            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        )}
       </div>
 
       <div className="flex-1">
         <div className="text-slate-900 mb-1 text-[16px]">{title}</div>
         <p className="text-slate-500 mb-2 text-[16px]">{description}</p>
-        
-        <AnimatePresence mode="wait">
-          {status === 'scanning' && (
-            <motion.p
-              key="scanning-text"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className={`${colors.text}`}
-            >
-              Escaneando...
-            </motion.p>
-          )}
-          {status === 'success' && (
-            <motion.p
-              key="success-text"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="text-green-600"
-            >
-              Acceso Concedido
-            </motion.p>
-          )}
-          {status === 'denied' && (
-            <motion.p
-              key="denied-text"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="text-red-600"
-            >
-              Acceso Denegado
-            </motion.p>
-          )}
-        </AnimatePresence>
       </div>
 
       <Button

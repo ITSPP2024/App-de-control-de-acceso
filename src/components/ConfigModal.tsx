@@ -110,42 +110,57 @@ export function ConfigModal({
   };
 
   // 🔹 Guardar configuración y vincular dispositivo con zona
-  const handleSave = async () => {
-    if (!currentZone || !selectedDevice) {
-      alert('Seleccione una zona y un dispositivo');
+ const handleSave = async () => {
+  if (!currentZone) {
+    alert('Seleccione una zona');
+    return;
+  }
+
+  const device = devices.find(
+    (d) => d.idDispositivo.toString() === selectedDevice
+  );
+
+  if (!device) {
+    alert('Seleccione un dispositivo válido');
+    return;
+  }
+
+  try {
+    // Valores que enviamos al servidor. Ajusta lock_key / wifi_lock si tu UI los provee.
+    const payload = {
+      Idzona_dispositivo: currentZone.idzonas,
+      idDispositivo: device.idDispositivo,
+      nombre_dispositivo: device.nombre_dispositivo,
+      tipo_dispositivo: "Biométrico TTLock",
+      nombre_zona_dispositivo: currentZone.nombre_zona,
+      ubicacion: currentZone.nombre_zona, // o "Entrada Principal" si quieres otro texto
+      Estado: "Activo",
+      lock_key: "",   // default vacío; si tienes el lock_key en UI, reemplázalo
+      wifi_lock: 0    // 1 si el dispositivo es wifi/Gateway, 0 si no
+    };
+
+    const response = await fetch('http://localhost:5002/api/dispositivo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Error al vincular dispositivo:', data);
+      alert('❌ Error al vincular dispositivo: ' + (data.error || JSON.stringify(data)));
       return;
     }
 
-    try {
-      const response = await fetch('http://localhost:5002/api/dispositivo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          Idzona_dispositivo: currentZone.idzonas,
-          nombre_dispositivo: devices.find((d) => d.idDispositivo.toString() === selectedDevice)?.nombre_dispositivo,
-          tipo_dispositivo: 'Lector biométrico',
-          ubicacion: currentZone.nombre_zona,
-          Estado: 'Activo',
-          creado_por: 1, // 🔸 Temporal hasta que login devuelva ID real
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('Error al vincular dispositivo:', data);
-        alert('❌ Error al vincular dispositivo: ' + data.error);
-        return;
-      }
-
-      console.log('✅', data.message);
-      alert('✅ Configuración guardada y dispositivo vinculado correctamente');
-      handleClose();
-    } catch (err) {
-      console.error('Error de conexión:', err);
-      alert('❌ Error al guardar la configuración');
-    }
-  };
+    console.log('✅', data.message);
+    alert('✅ Configuración guardada y dispositivo vinculado correctamente');
+    handleClose();
+  } catch (err) {
+    console.error('Error de conexión:', err);
+    alert('❌ Error al guardar la configuración');
+  }
+};
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

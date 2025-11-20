@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AccessControlHeader } from './components/AccessControlHeader';
 import { ScannerPanel } from './components/ScannerPanel';
 import { AccessTypeSelector } from './components/AccessTypeSelector';
 import { WelcomeMessage } from './components/WelcomeMessage';
 import { ConfigModal } from './components/ConfigModal';
 import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
 
-// Mock user database
 const mockUsers = [
   'Juan Pérez',
   'María González',
   'Carlos Rodríguez',
   'Ana Martínez',
   'Luis Torres',
-  'Sofia Ramírez',
+  'Sofía Ramírez',
 ];
 
 export type Zone = {
@@ -38,15 +38,50 @@ export default function App() {
     fingerprint: true,
   });
 
-  const handleAccessGranted = (method: string) => {
-    const randomUser = mockUsers[Math.floor(Math.random() * mockUsers.length)];
-    setCurrentUser(randomUser);
-    setTimeout(() => setCurrentUser(null), 5000);
-  };
+  // ------------------------
+  // Conexión WebSocket
+  // ------------------------
+  useEffect(() => {
+    const socket = new WebSocket("ws://localhost:5002/bridge");
+
+    socket.onopen = () => console.log("🟢 Conectado a WebSocket del servidor");
+
+    socket.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+
+        // Esperamos el evento automático desde TTLock
+        if (data.event === "access_attempt") {
+          const userName = data.user?.nombre || "Desconocido";
+          setCurrentUser(userName);
+
+          // Animaciones y toast según estado
+          if (data.estado === "Autorizado") {
+            toast.success('Acceso Concedido', {
+              description: `Usuario: ${userName}`,
+            });
+          } else {
+            toast.error('Acceso Denegado', {
+              description: data.motivo || "No autorizado",
+            });
+          }
+
+          // Limpiar usuario después de 5s
+          setTimeout(() => setCurrentUser(null), 5000);
+        }
+
+      } catch (e) {
+        console.error("Error parsing WS message:", e);
+      }
+    };
+
+    return () => socket.close();
+  }, []);
 
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 overflow-hidden">
       <Toaster />
+
       <ConfigModal 
         open={configOpen}
         onOpenChange={setConfigOpen}
@@ -57,6 +92,8 @@ export default function App() {
       />
       
       <div className="h-full flex flex-col p-6 gap-6">
+
+        {/* Header */}
         <div className="flex-shrink-0">
           <AccessControlHeader 
             zone={currentZone?.nombre_zona || ''}
@@ -67,21 +104,27 @@ export default function App() {
         </div>
 
         <div className="flex-1 grid grid-cols-3 gap-6 min-h-0">
+
           <div className="flex flex-col gap-6 min-h-0">
+
+            {/* Entrada / salida */}
             <div className="flex-shrink-0">
               <AccessTypeSelector 
                 accessType={accessType} 
                 onTypeChange={setAccessType} 
               />
             </div>
+
+            {/* Panel visual — ya no simula accesos */}
             <div className="flex-1 min-h-0">
               <ScannerPanel 
-                onAccessGranted={handleAccessGranted}
+                onAccessGranted={() => {}} 
                 enabledDevices={enabledDevices}
               />
             </div>
           </div>
 
+          {/* Mensaje de Bienvenida */}
           <div className="col-span-2 min-h-0">
             <WelcomeMessage 
               userName={currentUser} 

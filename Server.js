@@ -1,5 +1,3 @@
-// server.js
-// Servidor central para Desktop + integración TTLock (Gateway G2) + WebSocket bridge
 import express from "express";
 import dotenv from "dotenv";
 dotenv.config();
